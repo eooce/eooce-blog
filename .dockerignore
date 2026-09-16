@@ -1,0 +1,24 @@
+# 依赖
+node_modules
+web/node_modules
+
+# 构建产物（容器内重新构建）
+web/dist
+
+# 运行数据与本地文件
+data
+*.log
+
+# 环境与编辑器
+.env
+.env.*
+.claude
+.gemini
+.opencode
+.vscode
+.idea
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 标题与描述为占位值：生产由 Express 注入站点设置，开发由 Vite 插件注入 -->
+    <meta name="description" content="老王blog — 代码与文字的栖息地，记录前端工程、后端架构与设计思考" />
+    <meta name="theme-color" content="#185a56" />
+    <title>老王Blog</title>
+    <script>
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('blog_theme')
+          var dark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

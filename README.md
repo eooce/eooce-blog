@@ -54,9 +54,6 @@ bash start.sh
 容器内不运行 Vite 开发服务器：前端在构建阶段编译为静态产物，由 Express 托管，**单端口对外提供整站**（API + 页面）。默认端口 `3001`，与 `start.sh` 的端口约定保持一致。
 
 ```bash
-# 构建镜像
-docker build -t blog .
-
 # 运行（数据卷持久化 SQLite）
 docker run -d \
   --name blog \

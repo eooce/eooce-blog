@@ -38,48 +38,20 @@ blog/
 └── Dockerfile
 ```
 
-## 本地开发
+## 源代码一键部署
 
-要求 Node.js ≥ 22。
-
-```bash
-# 后端（根目录）
-npm install
-npm run dev          # http://localhost:3001
-
-# 前端（另开终端）
-cd web
-npm install
-npm run dev          # http://localhost:5173，已代理 /api 到 3001
+或使用一键脚本
+```
+git clone https://github.com/eooce/eooce-blog.git
+cd eooce-blog
+bash start.sh
 ```
 
-或使用一键脚本：`bash start.sh`
-
-登录后台：`/admin`，默认账号 `admin / admin123`（登录后请在「站点设置 → 账号安全」修改）。
-
-## 测试
-
-```bash
-npm test             # 28 个 API 测试，使用独立临时数据库
-```
-
-## 生产部署（传统方式）
-
-> 注意：`npm run start` 只启动后端。前端页面需要先构建出 `web/dist`，后端检测到后会自动托管整站（单端口：页面 + API）。
-
-```bash
-npm run setup      # 首次：安装前后端依赖
-npm run build      # 构建前端到 web/dist
-npm run start      # 启动服务，默认 3001 端口，访问 http://localhost:3001
-```
-
-后端会自动托管 `web/dist` 静态资源并对前端路由做 SPA 回退（可用 `WEB_DIST` 环境变量指定产物路径）。若启动时看到「未检测到前端构建产物」的警告，说明漏了 `npm run build`。
-
-本地开发则不需要构建：`npm run dev`（后端）+ `cd web && npm run dev`（前端，热更新）。
+登录后台：`/home`，默认账号 `admin / admin123`（登录后请在「站点设置 → 账号安全」修改）。
 
 ## Docker 部署
 
-容器内不运行 Vite 开发服务器：前端在构建阶段编译为静态产物，由 Express 托管，**单端口对外提供整站**（API + 页面）。默认端口 `9199`，与 `start.sh` 的端口约定保持一致。
+容器内不运行 Vite 开发服务器：前端在构建阶段编译为静态产物，由 Express 托管，**单端口对外提供整站**（API + 页面）。默认端口 `3001`，与 `start.sh` 的端口约定保持一致。
 
 ```bash
 # 构建镜像
@@ -88,21 +60,19 @@ docker build -t blog .
 # 运行（数据卷持久化 SQLite）
 docker run -d \
   --name blog \
-  -p 9199:9199 \
+  -p 3001:3001 \
   -e JWT_SECRET="请替换为随机长字符串" \
   -v blog-data:/app/data \
-  blog
+  ghcr.io/eooce/blog:latest
 ```
 
-访问 `http://localhost:9199` 即为博客首页，后台在 `/admin`。
-
-- 宿主机端口随意映射，例如 `-p 80:9199`；容器内监听端口可用 `-e PORT=xxxx` 覆盖（记得同步调整 `-p`）
+访问 `http://localhost:3001` 即为博客首页，后台在 `/home`。
 
 ### 环境变量
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `PORT` | `9199` | 容器内服务监听端口 |
+| `PORT` | `3001` | 容器内服务监听端口 |
 | `JWT_SECRET` | 内置开发密钥 | 登录令牌签名密钥，**生产必须修改** |
 | `BLOG_DB_PATH` | `/app/data/blog.db` | SQLite 数据库文件路径 |
 | `WEB_DIST` | `web/dist` | 前端构建产物目录 |
@@ -112,11 +82,12 @@ docker run -d \
 ```yaml
 services:
   blog:
-    build: .
+    image: ghcr.io/eooce/blog:latest
+    container_name: blog
     ports:
-      - "9199:9199"
+      - "3001:3001"
     environment:
-      JWT_SECRET: "请替换为随机长字符串"
+      JWT_SECRET: "abc1234567" # 请替换为随机长字符串
     volumes:
       - blog-data:/app/data
     restart: unless-stopped

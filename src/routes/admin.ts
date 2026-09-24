@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { db, estimateReadingMinutes, now } from '../db/database.js'
 import { requireAuth, signToken } from '../middleware/auth.js'
 import { ok, fail, HttpError } from '../utils/response.js'
-import { slugify, randomSuffix, assertValidSlug } from '../utils/slug.js'
+import { autoSlug, slugify, randomSuffix, assertValidSlug } from '../utils/slug.js'
+import { likePattern } from '../utils/search.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -71,7 +72,8 @@ const postPayload = z.object({
 })
 
 function uniquePostSlug(title: string, requested: string | undefined, excludeId?: number): string {
-  const base = slugify(requested || title)
+  // 手动填写的路径按原样转写；留空则按标题自动生成短路径
+  const base = requested ? slugify(requested) : autoSlug(title)
   assertValidSlug(base)
   let candidate = base
   let attempt = 0
@@ -113,8 +115,8 @@ router.get('/posts', (req, res) => {
     params.push(status)
   }
   if (search) {
-    where.push('p.title LIKE ?')
-    params.push(`%${search}%`)
+    where.push(`p.title LIKE ? ESCAPE '\\'`)
+    params.push(likePattern(search))
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
@@ -260,7 +262,50 @@ const categoryPayload = z.object({
 })
 
 router.get('/categories', (_req, res) => {
-  ok(res, db.prepare('SELECT * FROM categories ORDER BY name').all())
+  // 顺序与前台一致（sort_order 优先，未设置时按文章数），后台的上移/下移才对得上
+  ok(
+    res,
+    db
+      .prepare(
+        `SELECT c.*, COUNT(p.id) AS post_count
+         FROM categories c
+         LEFT JOIN posts p ON p.category_id = c.id AND p.status = 'published'
+         GROUP BY c.id ORDER BY c.sort_order, post_count DESC, c.name`,
+      )
+      .all(),
+  )
+})
+
+/** 上移 / 下移：先按当前展示顺序把 sort_order 归一化为 0..n-1，再与相邻项交换 */
+router.patch('/categories/:id/move', (req, res) => {
+  const id = Number(req.params.id)
+  const parsed = z.object({ direction: z.enum(['up', 'down']) }).safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, 400, '方向参数不合法')
+    return
+  }
+  const rows = db
+    .prepare(
+      `SELECT c.id, COUNT(p.id) AS post_count
+       FROM categories c
+       LEFT JOIN posts p ON p.category_id = c.id AND p.status = 'published'
+       GROUP BY c.id ORDER BY c.sort_order, post_count DESC, c.name`,
+    )
+    .all() as Array<{ id: number }>
+  const idx = rows.findIndex((r) => r.id === id)
+  if (idx < 0) throw new HttpError(404, '分类不存在')
+  const target = parsed.data.direction === 'up' ? idx - 1 : idx + 1
+
+  const move = db.transaction(() => {
+    // 归一化：把当前展示顺序固化为显式 sort_order
+    const setOrder = db.prepare('UPDATE categories SET sort_order = ? WHERE id = ?')
+    rows.forEach((r, i) => setOrder.run(i, r.id))
+    if (target < 0 || target >= rows.length) return
+    setOrder.run(target, rows[idx].id)
+    setOrder.run(idx, rows[target].id)
+  })
+  move()
+  ok(res, { id })
 })
 
 router.post('/categories', (req, res) => {
@@ -275,9 +320,12 @@ router.post('/categories', (req, res) => {
   while (db.prepare('SELECT id FROM categories WHERE slug = ?').get(slug)) {
     slug = `${slugify(parsed.data.slug || name)}-${randomSuffix()}`
   }
+  // 新分类排在最后，避免后台调整过顺序后被插入到最前面
+  const nextOrder =
+    ((db.prepare('SELECT MAX(sort_order) AS m FROM categories').get() as { m: number | null }).m ?? -1) + 1
   const result = db
-    .prepare('INSERT INTO categories (name, slug, description) VALUES (?, ?, ?)')
-    .run(name, slug, parsed.data.description ?? '')
+    .prepare('INSERT INTO categories (name, slug, description, sort_order) VALUES (?, ?, ?, ?)')
+    .run(name, slug, parsed.data.description ?? '', nextOrder)
   ok(res, { id: result.lastInsertRowid }, 201)
 })
 
@@ -560,6 +608,12 @@ router.put('/site', (req, res) => {
     site_subtitle: z.string().trim().max(120).default(''),
     about_content: z.string().max(20000).default(''),
     site_logo: z.string().max(700000).default(''),
+    icp_text: z.string().trim().max(60).default(''),
+    icp_url: z.string().trim().max(300).default(''),
+    icp_visible: z.boolean().default(true),
+    police_text: z.string().trim().max(60).default(''),
+    police_url: z.string().trim().max(300).default(''),
+    police_visible: z.boolean().default(true),
   })
   const parsed = schema.safeParse(req.body)
   if (!parsed.success) {
@@ -582,6 +636,15 @@ router.put('/site', (req, res) => {
   upsert.run('site_subtitle', parsed.data.site_subtitle)
   upsert.run('about_content', parsed.data.about_content)
   upsert.run('site_logo', logo)
+  // 备案信息：链接可为空（此时前台只显示文字，不可点击）
+  if (parsed.data.icp_url) assertExternalUrl(parsed.data.icp_url)
+  if (parsed.data.police_url) assertExternalUrl(parsed.data.police_url)
+  upsert.run('icp_text', parsed.data.icp_text)
+  upsert.run('icp_url', parsed.data.icp_url)
+  upsert.run('icp_visible', parsed.data.icp_visible ? '1' : '0')
+  upsert.run('police_text', parsed.data.police_text)
+  upsert.run('police_url', parsed.data.police_url)
+  upsert.run('police_visible', parsed.data.police_visible ? '1' : '0')
   ok(res, { message: '站点信息已更新' })
 })
 

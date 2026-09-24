@@ -35,6 +35,8 @@ export interface Category {
   slug: string
   description: string
   post_count?: number
+  /** 排序权重：越小越靠前（前台菜单与分类页都按此排序） */
+  sort_order?: number
 }
 
 export interface Tag {
@@ -82,6 +84,15 @@ export interface SiteInfo {
   site_subtitle: string
   about_content: string
   site_logo?: string
+  /** 备案号文字，如「京ICP备2024012345号-1」 */
+  icp_text?: string
+  icp_url?: string
+  /** '1' 显示 / '0' 隐藏 */
+  icp_visible?: string
+  /** 网安备案文字，如「京公网安备11010502030123号」 */
+  police_text?: string
+  police_url?: string
+  police_visible?: string
 }
 
 export type NavMenuType = 'system' | 'group' | 'page' | 'link'

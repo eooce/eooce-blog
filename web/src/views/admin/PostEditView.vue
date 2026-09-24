@@ -174,6 +174,23 @@ function toggleTag(id: number) {
         </div>
 
         <div class="card p-5">
+          <h3 class="mb-3 text-sm font-bold text-slate-900 dark:text-white">文章路径</h3>
+          <input
+            v-model="form.slug"
+            type="text"
+            placeholder="留空自动生成"
+            maxlength="140"
+            class="input"
+          />
+          <p class="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+            留空则自动生成：英文开头取开头的英文部分（AWS大放水… → aws），中文取前两个字的拼音（注册最重要的环境… → zhu-ce）。可自定义，仅字母、数字与连字符有效。
+          </p>
+          <p v-if="form.slug" class="mt-1.5 truncate text-xs text-slate-400 dark:text-slate-500">
+            /post/{{ form.slug }}
+          </p>
+        </div>
+
+        <div class="card p-5">
           <h3 class="mb-3 text-sm font-bold text-slate-900 dark:text-white">分类</h3>
           <select v-model="form.category_id" class="input">
             <option :value="null">未分类</option>

@@ -25,6 +25,19 @@ const footerNavs = computed(() => {
   return out
 })
 
+/** 备案信息：文字为空或后台关闭显示则该条不出现（两条都为空的整体也不渲染） */
+const beianItems = computed(() => {
+  const info = site.info
+  const items: Array<{ key: string; text: string; url: string; police: boolean }> = []
+  if (info.icp_text && info.icp_visible !== '0') {
+    items.push({ key: 'icp', text: info.icp_text, url: info.icp_url ?? '', police: false })
+  }
+  if (info.police_text && info.police_visible !== '0') {
+    items.push({ key: 'police', text: info.police_text, url: info.police_url ?? '', police: true })
+  }
+  return items
+})
+
 onMounted(async () => {
   navStore.fetch()
   try {
@@ -36,7 +49,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <footer class="relative mt-20">
+  <footer class="relative mt-8">
     <div class="gradient-line" aria-hidden="true" />
     <div class="pointer-events-none absolute inset-x-0 top-0 h-40 overflow-hidden" aria-hidden="true">
       <div class="absolute -top-28 left-1/4 h-56 w-56 rounded-full bg-brand-300/15 blur-3xl dark:bg-brand-500/10" />
@@ -127,8 +140,8 @@ onMounted(async () => {
         </ul>
       </div>
 
-      <div class="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-200/70 pt-6 sm:flex-row dark:border-slate-800">
-        <p class="text-xs text-slate-400 dark:text-slate-500">
+      <div class="mt-10 grid gap-3 border-t border-slate-200/70 pt-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center dark:border-slate-800">
+        <p class="text-center text-xs text-slate-400 sm:text-left dark:text-slate-500">
           © {{ year }} {{ site.info.site_title }} · Powered by
           <a
             href="https://github.com/eooce/eooce-blog"
@@ -139,7 +152,29 @@ onMounted(async () => {
             eooce
           </a>
         </p>
-        <p class="text-xs text-slate-400 dark:text-slate-500">
+
+        <div
+          class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5"
+          :class="beianItems.length ? '' : 'hidden sm:flex'"
+        >
+          <a
+            v-for="item in beianItems"
+            :key="item.key"
+            :href="item.url || undefined"
+            :target="item.url ? '_blank' : undefined"
+            :rel="item.url ? 'noopener noreferrer' : undefined"
+            class="inline-flex items-center gap-1 text-xs text-slate-400 transition-colors dark:text-slate-500"
+            :class="item.url ? 'hover:text-brand-500 dark:hover:text-brand-400' : ''"
+            :title="item.police ? '全国互联网安全管理服务平台' : '工业和信息化部政务服务平台'"
+          >
+            <svg v-if="item.police" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path d="M12 3l7 3v6c0 4.2-2.9 7.9-7 9-4.1-1.1-7-4.8-7-9V6l7-3Z" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            {{ item.text }}
+          </a>
+        </div>
+
+        <p class="text-center text-xs text-slate-400 sm:text-right dark:text-slate-500">
           用 <span class="text-rose-500">♥</span> 编写，与代码一同成长
         </p>
       </div>

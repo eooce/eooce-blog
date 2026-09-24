@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { db } from '../db/database.js'
 import { ok, fail, HttpError } from '../utils/response.js'
-import { escapeRegExp } from '../utils/slug.js'
+import { likePattern } from '../utils/search.js'
 
 const router = Router()
 
@@ -68,8 +68,10 @@ router.get('/posts', (req, res) => {
     params.push(tag)
   }
   if (search) {
-    const like = `%${escapeRegExp(search)}%`
-    where.push('(p.title LIKE ? ESCAPE "\\" OR p.content LIKE ? ESCAPE "\\" OR p.summary LIKE ? ESCAPE "\\")')
+    const like = likePattern(search)
+    where.push(
+      `(p.title LIKE ? ESCAPE '\\' OR p.content LIKE ? ESCAPE '\\' OR p.summary LIKE ? ESCAPE '\\')`,
+    )
     params.push(like, like, like)
   }
 
@@ -214,10 +216,10 @@ router.get('/links', (_req, res) => {
 router.get('/categories', (_req, res) => {
   const list = db
     .prepare(
-      `SELECT c.id, c.name, c.slug, c.description, COUNT(p.id) AS post_count
+      `SELECT c.id, c.name, c.slug, c.description, c.sort_order, COUNT(p.id) AS post_count
        FROM categories c
        LEFT JOIN posts p ON p.category_id = c.id AND p.status = 'published'
-       GROUP BY c.id ORDER BY post_count DESC, c.name`,
+       GROUP BY c.id ORDER BY c.sort_order, post_count DESC, c.name`,
     )
     .all()
   ok(res, list)

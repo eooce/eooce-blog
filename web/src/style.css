@@ -33,8 +33,14 @@
     @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
     text-rendering: optimizeLegibility;
   }
+  /* 选中文字：品牌橘色高亮 + 深色文字，保证高亮块上的文字依然清晰 */
   ::selection {
-    @apply bg-brand-500/25 text-brand-700 dark:text-brand-200;
+    background-color: #fd8444;
+    color: #3d1405;
+  }
+  .dark ::selection {
+    background-color: #fd742d;
+    color: #2b0d02;
   }
 
   /* 细滚动条 */
@@ -60,7 +66,7 @@
 
 @layer components {
   .container-page {
-    @apply mx-auto w-full max-w-5xl px-4 sm:px-6;
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
   }
   .card {
     @apply rounded-2xl border border-slate-200/80 bg-white shadow-soft transition-all duration-300 dark:border-slate-800 dark:bg-slate-900;

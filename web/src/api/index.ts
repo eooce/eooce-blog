@@ -73,6 +73,8 @@ export const adminApi = {
   updateCategory: (id: number, body: { name: string; slug?: string; description?: string }) =>
     client.put(`/admin/categories/${id}`, body),
   deleteCategory: (id: number) => client.delete(`/admin/categories/${id}`),
+  moveCategory: (id: number, direction: 'up' | 'down') =>
+    client.patch(`/admin/categories/${id}/move`, { direction }),
 
   tags: () => client.get<unknown, Tag[]>('/admin/tags'),
   createTag: (body: { name: string }) => client.post<unknown, { id: number }>('/admin/tags', body),
@@ -87,7 +89,7 @@ export const adminApi = {
     client.patch(`/admin/comments/${id}/status`, { status }),
   deleteComment: (id: number) => client.delete(`/admin/comments/${id}`),
 
-  updateSite: (body: SiteInfo) => client.put('/admin/site', body),
+  updateSite: (body: Record<string, unknown>) => client.put('/admin/site', body),
   updateAccount: (body: { current_password: string; username?: string; new_password?: string }) =>
     client.put<unknown, { token: string; username: string; message: string }>('/admin/account', body),
 

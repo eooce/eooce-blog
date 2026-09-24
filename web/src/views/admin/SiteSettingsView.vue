@@ -8,7 +8,18 @@ const site = useSiteStore()
 const auth = useAuthStore()
 
 /* ---------------- 站点信息 ---------------- */
-const form = ref({ site_title: '', site_subtitle: '', about_content: '', site_logo: '' })
+const form = ref({
+  site_title: '',
+  site_subtitle: '',
+  about_content: '',
+  site_logo: '',
+  icp_text: '',
+  icp_url: '',
+  icp_visible: true,
+  police_text: '',
+  police_url: '',
+  police_visible: true,
+})
 const savingSite = ref(false)
 const siteMessage = ref('')
 const siteError = ref('')
@@ -23,6 +34,12 @@ async function loadSite() {
     site_subtitle: site.info.site_subtitle,
     about_content: site.info.about_content,
     site_logo: site.info.site_logo ?? '',
+    icp_text: site.info.icp_text ?? '',
+    icp_url: site.info.icp_url ?? '',
+    icp_visible: site.info.icp_visible !== '0',
+    police_text: site.info.police_text ?? '',
+    police_url: site.info.police_url ?? '',
+    police_visible: site.info.police_visible !== '0',
   }
 }
 
@@ -177,6 +194,42 @@ onMounted(loadSite)
             class="input resize-y font-mono text-[13px]"
             placeholder="支持 Markdown 语法，展示在「关于」页面"
           />
+        </div>
+
+        <!-- 备案信息 -->
+        <div class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-800">
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white">备案信息</h3>
+          <p class="mt-1 text-xs text-slate-400">展示在页脚底部中间，点击以新标签页打开；关闭开关可单独隐藏，文字留空同样不显示</p>
+
+          <div class="mt-4 space-y-4">
+            <div>
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">ICP 备案</span>
+                <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <input v-model="form.icp_visible" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                  显示
+                </label>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input v-model="form.icp_text" type="text" maxlength="60" class="input" placeholder="备案号，如：京ICP备2024012345号-1" />
+                <input v-model="form.icp_url" type="url" maxlength="300" class="input" placeholder="链接，如：https://beian.miit.gov.cn/" />
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">网安备案</span>
+                <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <input v-model="form.police_visible" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                  显示
+                </label>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input v-model="form.police_text" type="text" maxlength="60" class="input" placeholder="备案号，如：京公网安备11010502030123号" />
+                <input v-model="form.police_url" type="url" maxlength="300" class="input" placeholder="链接，如：https://beian.mps.gov.cn/" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="flex items-center justify-between gap-4">

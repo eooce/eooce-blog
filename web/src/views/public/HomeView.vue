@@ -23,7 +23,8 @@ const page = computed(() => Math.max(1, Number(route.query.page) || 1))
 const loading = ref(true)
 
 const featured = computed(() => posts.value[0])
-const rest = computed(() => posts.value.slice(1))
+// 第二屏卡片最多 9 个：首页共 10 篇 = 1 篇置顶大卡片 + 9 个卡片
+const rest = computed(() => posts.value.slice(1, 10))
 
 // 特色文章封面加载失败时回退为渐变占位图（切换文章后重置）
 const coverBroken = ref(false)
@@ -94,7 +95,7 @@ onMounted(() => {
               <span class="absolute inline-flex h-full w-full animate-ping-soft rounded-full bg-brand-500" />
               <span class="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
             </span>
-            欢迎来到 老王Blog
+            欢迎来到 {{ site.info.site_title }}
           </p>
 
           <h1 class="text-4xl font-black leading-[1.3] tracking-tight text-slate-900 sm:text-6xl sm:leading-[1.3] dark:text-white">
@@ -126,7 +127,7 @@ onMounted(() => {
                 <path d="M5 12h14m0 0-6-6m6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </router-link>
-            <router-link to="/about" class="btn-outline">了解博主</router-link>
+            <router-link to="/about" class="btn-outline">了解更多</router-link>
           </div>
 
           <!-- 数据统计（数字滚动） -->
@@ -194,7 +195,7 @@ onMounted(() => {
           :to="`/post/${featured.slug}`"
           class="card group mb-6 grid overflow-hidden hover:-translate-y-1 hover:shadow-lift sm:grid-cols-5"
         >
-          <div class="relative aspect-[21/9] overflow-hidden sm:aspect-auto sm:col-span-2">
+          <div class="relative aspect-video overflow-hidden sm:col-span-2">
             <div class="absolute inset-0 transition-transform duration-700 group-hover:scale-105">
               <img
                 v-if="featured.cover_image && !coverBroken"

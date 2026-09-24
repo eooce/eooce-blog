@@ -67,6 +67,17 @@ async function remove(cat: Category) {
   await load()
 }
 
+/** 上移 / 下移：顺序即前台分类菜单与分类页的展示顺序 */
+async function move(cat: Category, direction: 'up' | 'down') {
+  error.value = ''
+  try {
+    await adminApi.moveCategory(cat.id, direction)
+    await load()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '排序失败'
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -75,7 +86,9 @@ onMounted(load)
     <header class="mb-6 flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-black tracking-tight text-slate-900 dark:text-white">分类管理</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">删除分类后，其下文章将变为未分类</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          删除分类后，其下文章将变为未分类；用「排序」列的箭头调整分类顺序，前台分类菜单与分类页会同步
+        </p>
       </div>
       <button class="btn-primary" @click="creating = !creating">
         {{ creating ? '取消' : '新建分类' }}
@@ -102,12 +115,13 @@ onMounted(load)
               <th class="px-5 py-3.5 font-semibold">Slug</th>
               <th class="px-5 py-3.5 font-semibold">描述</th>
               <th class="px-5 py-3.5 font-semibold">文章数</th>
+              <th class="px-5 py-3.5 font-semibold">排序</th>
               <th class="px-5 py-3.5 text-right font-semibold">操作</th>
             </tr>
           </thead>
           <tbody v-if="!loading">
             <tr
-              v-for="cat in categories"
+              v-for="(cat, i) in categories"
               :key="cat.id"
               class="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800/70 dark:hover:bg-slate-800/40"
             >
@@ -137,6 +151,30 @@ onMounted(load)
               </td>
               <td class="px-5 py-4 text-slate-500 dark:text-slate-400">{{ cat.post_count ?? 0 }}</td>
               <td class="px-5 py-4">
+                <div class="flex items-center gap-1">
+                  <button
+                    class="btn-ghost h-7 w-7 rounded-lg p-0 text-xs disabled:opacity-30"
+                    title="上移"
+                    :disabled="i === 0"
+                    @click="move(cat, 'up')"
+                  >
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                  <button
+                    class="btn-ghost h-7 w-7 rounded-lg p-0 text-xs disabled:opacity-30"
+                    title="下移"
+                    :disabled="i === categories.length - 1"
+                    @click="move(cat, 'down')"
+                  >
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+              <td class="px-5 py-4">
                 <div class="flex justify-end gap-1.5">
                   <template v-if="editing === cat.id">
                     <button class="btn-ghost !px-2 text-xs text-emerald-600" @click="saveEdit(cat)">保存</button>
@@ -150,7 +188,7 @@ onMounted(load)
               </td>
             </tr>
             <tr v-if="!categories.length">
-              <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-400">暂无分类</td>
+              <td colspan="6" class="px-5 py-10 text-center text-sm text-slate-400">暂无分类</td>
             </tr>
           </tbody>
         </table>

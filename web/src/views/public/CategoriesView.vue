@@ -22,11 +22,11 @@ onMounted(async () => {
   <div class="container-page py-10">
     <PageHeader title="文章分类" eyebrow="Categories" description="按主题领域浏览全部内容" />
 
-    <div v-if="loading" class="grid gap-6 sm:grid-cols-2">
+    <div v-if="loading" class="mx-auto grid max-w-5xl gap-x-10 gap-y-6 sm:grid-cols-2">
       <div v-for="i in 4" :key="i" class="card h-32 animate-pulse bg-slate-100 dark:bg-slate-800" />
     </div>
 
-    <div v-else-if="categories.length" class="grid gap-6 sm:grid-cols-2">
+    <div v-else-if="categories.length" class="mx-auto grid max-w-5xl gap-x-10 gap-y-6 sm:grid-cols-2">
       <router-link
         v-for="(cat, i) in categories"
         :key="cat.id"

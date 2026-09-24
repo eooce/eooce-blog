@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS categories (
   name TEXT NOT NULL UNIQUE,
   slug TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -122,6 +123,12 @@ CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, status);
 const tagColumns = db.prepare('PRAGMA table_info(tags)').all() as Array<{ name: string }>
 if (!tagColumns.some((c) => c.name === 'is_center')) {
   db.exec('ALTER TABLE tags ADD COLUMN is_center INTEGER NOT NULL DEFAULT 0')
+}
+
+// 旧库升级：categories 表补充排序字段（后台可调整分类在菜单与分类页中的顺序）
+const categoryColumns = db.prepare('PRAGMA table_info(categories)').all() as Array<{ name: string }>
+if (!categoryColumns.some((c) => c.name === 'sort_order')) {
+  db.exec('ALTER TABLE categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0')
 }
 
 export function estimateReadingMinutes(content: string): number {

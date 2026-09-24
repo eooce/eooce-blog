@@ -45,7 +45,8 @@ onMounted(load)
   <div class="container-page py-10">
     <PageHeader title="留言板" eyebrow="Guestbook" description="随便聊聊，留下你的想法与建议，审核通过后会展示在这里" />
 
-    <div class="mx-auto max-w-3xl">
+    <!-- 左移量对齐标题「留言板」的第三个字（2 个字宽），随标题字号在 sm 断点变化 -->
+    <div class="ml-[3.625rem] max-w-3xl sm:ml-[4.375rem]">
       <!-- 留言表单 -->
       <form v-reveal class="card space-y-4 p-6" @submit.prevent="submit">
         <div class="grid gap-4 sm:grid-cols-2">

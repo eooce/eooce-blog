@@ -107,7 +107,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="container-page py-8">
+  <div class="container-page max-w-7xl py-8">
     <div v-if="loading" class="mx-auto max-w-3xl py-10">
       <div class="card h-96 animate-pulse bg-slate-100 dark:bg-slate-800" />
     </div>
@@ -120,7 +120,7 @@ onMounted(() => {
       <router-link to="/" class="btn-primary">返回首页</router-link>
     </EmptyState>
 
-    <div v-else-if="post" class="mx-auto flex max-w-6xl gap-10">
+    <div v-else-if="post" class="mx-auto flex max-w-7xl gap-10">
       <article class="min-w-0 flex-1">
         <div v-reveal class="overflow-hidden rounded-3xl border border-slate-200/80 shadow-soft dark:border-slate-800">
           <div class="aspect-[21/7]">

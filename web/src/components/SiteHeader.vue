@@ -225,12 +225,24 @@ onBeforeUnmount(() => {
       </nav>
 
       <div class="flex items-center gap-1">
-        <form class="hidden items-center lg:flex" @submit.prevent="submitSearch">
+        <form class="relative hidden items-center lg:flex" @submit.prevent="submitSearch">
+          <svg
+            class="pointer-events-none absolute left-3 h-4 w-4 text-slate-400 dark:text-slate-500"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.6-3.6" stroke-linecap="round" />
+          </svg>
           <input
             v-model="keyword"
             type="search"
             placeholder="搜索文章..."
-            class="w-40 rounded-xl border border-transparent bg-slate-100 px-3 py-1.5 text-sm transition-all duration-300 placeholder-slate-400 focus:w-56 focus:border-brand-400 focus:bg-white focus:shadow-glow focus:outline-none dark:bg-slate-800 dark:focus:bg-slate-900"
+            aria-label="搜索文章"
+            class="w-40 rounded-xl border border-transparent bg-slate-100 py-1.5 pl-9 pr-3 text-sm transition-all duration-300 placeholder-slate-400 focus:w-56 focus:border-brand-400 focus:bg-white focus:shadow-glow focus:outline-none dark:bg-slate-800 dark:focus:bg-slate-900"
           />
         </form>
 
@@ -369,8 +381,19 @@ onBeforeUnmount(() => {
               {{ item.label }}
             </router-link>
           </template>
-          <form class="mt-2 flex gap-2" @submit.prevent="submitSearch">
-            <input v-model="keyword" type="search" placeholder="搜索文章..." class="input flex-1" />
+          <form class="relative mt-2 flex gap-2" @submit.prevent="submitSearch">
+            <svg
+              class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.6-3.6" stroke-linecap="round" />
+            </svg>
+            <input v-model="keyword" type="search" placeholder="搜索文章..." aria-label="搜索文章" class="input flex-1 pl-9" />
             <button type="submit" class="btn-primary">搜索</button>
           </form>
         </nav>

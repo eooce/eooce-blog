@@ -14,7 +14,7 @@ const coverSrc = computed(() => (props.post.cover_image && !coverBroken.value ? 
 
 <template>
   <article class="card group flex h-full flex-col overflow-hidden hover:-translate-y-1.5 hover:shadow-lift">
-    <router-link :to="`/post/${post.slug}`" class="relative block aspect-[21/9] overflow-hidden">
+    <router-link :to="`/post/${post.slug}`" class="relative block aspect-video overflow-hidden">
       <img
         v-if="coverSrc"
         :src="coverSrc"

@@ -137,6 +137,41 @@ describe('public posts visibility', () => {
     expect(res.body.data.total).toBeGreaterThanOrEqual(1)
   })
 
+  it('searches posts by title or content', async () => {
+    insertPost({ title: 'Vue 3 组合式 API 实践', slug: 'vue-composition', status: 'published', content: '正文内容一' })
+    insertPost({ title: 'Docker 部署笔记', slug: 'docker-deploy', status: 'published', content: '这里也提到了 vue 的构建' })
+    insertPost({ title: '无关文章', slug: 'irrelevant-search', status: 'published', content: '没有关键词' })
+
+    const byTitle = await request(app).get('/api/posts?search=Vue')
+    expect(byTitle.status).toBe(200)
+    const slugs = byTitle.body.data.list.map((p: { slug: string }) => p.slug)
+    expect(slugs).toContain('vue-composition')
+    expect(slugs).toContain('docker-deploy') // 正文命中
+    expect(slugs).not.toContain('irrelevant-search')
+
+    // 关键词大小写不敏感（ASCII）
+    const lower = await request(app).get('/api/posts?search=vue')
+    expect(lower.body.data.total).toBe(byTitle.body.data.total)
+
+    const none = await request(app).get('/api/posts?search=zzz-not-exist')
+    expect(none.status).toBe(200)
+    expect(none.body.data.total).toBe(0)
+  })
+
+  it('treats LIKE wildcards in the keyword literally', async () => {
+    insertPost({ title: '折扣 50% 起', slug: 'discount-50', status: 'published' })
+    insertPost({ title: '普通文章', slug: 'plain-post', status: 'published' })
+
+    const percent = await request(app).get('/api/posts?search=%25')
+    expect(percent.status).toBe(200)
+    // % 应只命中标题里真的含 % 的文章，而不是当通配符匹配全部
+    expect(percent.body.data.list.map((p: { slug: string }) => p.slug)).toEqual(['discount-50'])
+
+    const underscore = await request(app).get('/api/posts?search=_')
+    expect(underscore.status).toBe(200)
+    expect(underscore.body.data.total).toBe(0)
+  })
+
   it('hides draft after creation and reveals it after publish', async () => {
     const created = await request(app)
       .post('/api/admin/posts')
@@ -195,6 +230,31 @@ describe('post management', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ title: 'Duplicate Title Here', content: 'b', tag_ids: [] })
     expect(a.body.data.slug).not.toBe(b.body.data.slug)
+  })
+
+  it('derives a short slug from the title when slug is omitted', async () => {
+    const cn = await request(app)
+      .post('/api/admin/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: '注册最重要的环境就是环境', content: 'a', tag_ids: [] })
+    expect(cn.body.data.slug).toBe('zhu-ce')
+
+    const en = await request(app)
+      .post('/api/admin/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'AWS大放水？免绑卡注册aws，获得至少免费半年vps', content: 'a', tag_ids: [] })
+    expect(en.body.data.slug).toBe('aws')
+  })
+
+  it('keeps a custom slug when provided', async () => {
+    const res = await request(app)
+      .post('/api/admin/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: '任意中文标题', slug: 'my-own-path', content: 'a', status: 'published', tag_ids: [] })
+    expect(res.body.data.slug).toBe('my-own-path')
+
+    const detail = await request(app).get('/api/posts/my-own-path')
+    expect(detail.status).toBe(200)
   })
 
   it('supports pagination with total', async () => {
@@ -331,6 +391,51 @@ describe('site logo', () => {
       .put('/api/admin/site')
       .set('Authorization', `Bearer ${token}`)
       .send({ site_title: 'Test Blog', site_subtitle: '', about_content: '', site_logo: 'javascript:alert(1)' })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('filing info (备案)', () => {
+  it('stores icp and police links with visibility flags', async () => {
+    const token = await login()
+    const res = await request(app)
+      .put('/api/admin/site')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        site_title: 'Test Blog',
+        icp_text: '京ICP备2024012345号-1',
+        icp_url: 'https://beian.miit.gov.cn/',
+        icp_visible: true,
+        police_text: '京公网安备11010502030123号',
+        police_url: 'https://beian.mps.gov.cn/',
+        police_visible: false,
+      })
+    expect(res.status).toBe(200)
+
+    const site = await request(app).get('/api/site')
+    expect(site.body.data.icp_text).toBe('京ICP备2024012345号-1')
+    expect(site.body.data.icp_url).toBe('https://beian.miit.gov.cn/')
+    expect(site.body.data.icp_visible).toBe('1')
+    expect(site.body.data.police_visible).toBe('0')
+  })
+
+  it('clears filing text when submitted empty', async () => {
+    const token = await login()
+    await request(app)
+      .put('/api/admin/site')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ site_title: 'Test Blog', icp_text: '', icp_url: '', icp_visible: true })
+
+    const site = await request(app).get('/api/site')
+    expect(site.body.data.icp_text).toBe('')
+  })
+
+  it('rejects a filing link that is not http(s)', async () => {
+    const token = await login()
+    const res = await request(app)
+      .put('/api/admin/site')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ site_title: 'Test Blog', icp_url: 'beian.miit.gov.cn' })
     expect(res.status).toBe(400)
   })
 })
@@ -505,6 +610,49 @@ describe('category slug', () => {
     const list2 = await request(app).get('/api/admin/categories').set('Authorization', `Bearer ${token}`)
     const cat2 = list2.body.data.find((c: { id: number }) => c.id === cat.id)
     expect(cat2.slug).toBe('renamed-cat')
+  })
+})
+
+describe('category ordering', () => {
+  it('reorders categories and exposes the order on the public API', async () => {
+    const token = await login()
+    for (const name of ['排序甲', '排序乙', '排序丙']) {
+      await request(app).post('/api/admin/categories').set('Authorization', `Bearer ${token}`).send({ name })
+    }
+
+    const before = await request(app).get('/api/admin/categories').set('Authorization', `Bearer ${token}`)
+    const names = (res: { body: { data: Array<{ name: string }> } }) => res.body.data.map((c) => c.name)
+    const publicNames = async () => {
+      const res = await request(app).get('/api/categories')
+      return (res.body.data as Array<{ name: string }>).map((c) => c.name)
+    }
+
+    // 新分类追加在末尾
+    const order0 = names(before)
+    expect(order0.slice(-3)).toEqual(['排序甲', '排序乙', '排序丙'])
+    expect(await publicNames()).toEqual(order0)
+
+    // 最后一个上移一位：与「排序乙」互换
+    const last = before.body.data.find((c: { name: string }) => c.name === '排序丙')
+    const move = await request(app)
+      .patch(`/api/admin/categories/${last.id}/move`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ direction: 'up' })
+    expect(move.status).toBe(200)
+
+    const after = names(await request(app).get('/api/admin/categories').set('Authorization', `Bearer ${token}`))
+    expect(after.slice(-3)).toEqual(['排序甲', '排序丙', '排序乙'])
+    // 前台分类接口顺序与后台一致（分类菜单取的就是这个顺序）
+    expect(await publicNames()).toEqual(after)
+
+    // 已在首位时上移无副作用
+    const first = after[0]
+    await request(app)
+      .patch(`/api/admin/categories/${(await request(app).get('/api/admin/categories').set('Authorization', `Bearer ${token}`)).body.data[0].id}/move`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ direction: 'up' })
+    const head = names(await request(app).get('/api/admin/categories').set('Authorization', `Bearer ${token}`))
+    expect(head[0]).toBe(first)
   })
 })
 

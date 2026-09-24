@@ -17,7 +17,7 @@ RUN npm ci
 # 容器内不运行 Vite：前端构建产物由 Express 托管，单端口对外提供整站
 # 默认 PORT=3001 与 start.sh 的端口约定一致，可用 -e PORT=xxxx 覆盖
 FROM node:24-alpine
-ENV NODE_ENV=production \
+ENV NODE_ENV=production
 
 WORKDIR /app
 

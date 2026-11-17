@@ -3,11 +3,12 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { publicApi } from '@/api'
-import type { Comment, PostDetail } from '@/types'
+import type { PostDetail } from '@/types'
 import { BASE_TITLE } from '@/utils/title'
 import MarkdownView, { type TocItem } from '@/components/MarkdownView.vue'
 import CoverPlaceholder from '@/components/CoverPlaceholder.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
 const post = ref<PostDetail | null>(null)
@@ -18,14 +19,6 @@ const coverBroken = ref(false)
 
 const toc = ref<TocItem[]>([])
 const activeHeading = ref('')
-
-const comments = ref<Comment[]>([])
-const commentsLoading = ref(true)
-
-const form = ref({ nickname: '', email: '', content: '' })
-const submitting = ref(false)
-const submitMessage = ref('')
-const submitError = ref('')
 
 const formatDate = (d: string | null) => (d ? dayjs(d).format('YYYY年MM月DD日') : '')
 
@@ -44,30 +37,6 @@ async function loadPost() {
     loading.value = false
   }
   void nextTick(() => setupObserver())
-}
-
-async function loadComments() {
-  commentsLoading.value = true
-  try {
-    comments.value = await publicApi.comments(route.params.slug as string)
-  } finally {
-    commentsLoading.value = false
-  }
-}
-
-async function submitComment() {
-  submitError.value = ''
-  submitMessage.value = ''
-  submitting.value = true
-  try {
-    await publicApi.addComment(route.params.slug as string, { ...form.value })
-    submitMessage.value = '评论提交成功，审核通过后将会展示，感谢参与！'
-    form.value = { nickname: '', email: '', content: '' }
-  } catch (e) {
-    submitError.value = e instanceof Error ? e.message : '提交失败，请重试'
-  } finally {
-    submitting.value = false
-  }
 }
 
 let observer: IntersectionObserver | null = null
@@ -96,13 +65,11 @@ onBeforeUnmount(() => observer?.disconnect())
 watch(() => route.params.slug, () => {
   if (route.name === 'post-detail') {
     loadPost()
-    loadComments()
   }
 })
 
 onMounted(() => {
   loadPost()
-  loadComments()
 })
 </script>
 
@@ -212,60 +179,7 @@ onMounted(() => {
         </nav>
 
         <section class="mt-12">
-          <h2 class="mb-6 text-xl font-bold text-slate-900 dark:text-white">
-            评论 <span class="text-sm font-normal text-slate-400">({{ comments.length }})</span>
-          </h2>
-
-          <form class="card space-y-4 p-6" @submit.prevent="submitComment">
-            <div class="grid gap-4 sm:grid-cols-2">
-              <input v-model="form.nickname" type="text" placeholder="昵称 *" required maxlength="30" class="input" />
-              <input v-model="form.email" type="email" placeholder="邮箱 *（不会被展示）" required class="input" />
-            </div>
-            <textarea
-              v-model="form.content"
-              placeholder="说点什么吧... *"
-              required
-              rows="4"
-              maxlength="1000"
-              class="input resize-none"
-            />
-            <div class="flex items-center justify-between gap-4">
-              <p v-if="submitMessage" class="text-sm text-emerald-600 dark:text-emerald-400">{{ submitMessage }}</p>
-              <p v-else-if="submitError" class="text-sm text-rose-600 dark:text-rose-400">{{ submitError }}</p>
-              <span v-else class="text-xs text-slate-400">评论将展示在审核通过后</span>
-              <button type="submit" class="btn-primary shrink-0" :disabled="submitting">
-                {{ submitting ? '提交中...' : '发表评论' }}
-              </button>
-            </div>
-          </form>
-
-          <div v-if="commentsLoading" class="mt-6 space-y-4">
-            <div v-for="i in 2" :key="i" class="card h-20 animate-pulse bg-slate-100 dark:bg-slate-800" />
-          </div>
-          <div v-else-if="comments.length" class="mt-6 space-y-4">
-            <div
-              v-for="(comment, i) in comments"
-              :key="comment.id"
-              v-reveal="Math.min(i * 60, 300)"
-              class="card p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift"
-            >
-              <div class="flex items-center gap-3">
-                <div
-                  class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white shadow-soft transition-transform duration-300 hover:scale-110 hover:rotate-6"
-                >
-                  {{ comment.nickname.slice(0, 1) }}
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ comment.nickname }}</p>
-                  <p class="text-xs text-slate-400">{{ dayjs(comment.created_at).format('YYYY-MM-DD HH:mm') }}</p>
-                </div>
-              </div>
-              <p class="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ comment.content }}</p>
-            </div>
-          </div>
-          <p v-else class="mt-6 rounded-2xl bg-slate-50 py-8 text-center text-sm text-slate-400 dark:bg-slate-900 dark:text-slate-500">
-            还没有评论，来抢沙发吧
-          </p>
+          <CommentSection source="post" :slug="route.params.slug as string" title="评论" />
         </section>
       </article>
 

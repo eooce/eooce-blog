@@ -53,6 +53,12 @@ export interface Comment {
   post_id?: number
   post_title?: string
   post_slug?: string
+  /** 被回复的评论 id，null/undefined 表示根评论 */
+  parent_id?: number | null
+  /** 1 = 博主回复 */
+  is_admin?: number
+  /** 被回复者的昵称（仅后台列表返回） */
+  parent_nickname?: string
   nickname: string
   email?: string
   content: string
@@ -62,6 +68,11 @@ export interface Comment {
 
 export interface GuestbookMessage {
   id: number
+  parent_id?: number | null
+  /** 1 = 博主回复 */
+  is_admin?: number
+  /** 被回复者的昵称（仅后台列表返回） */
+  parent_nickname?: string
   nickname: string
   email?: string
   content: string

@@ -308,6 +308,90 @@ describe('comment workflow', () => {
   })
 })
 
+describe('comment replies', () => {
+  it('keeps visitor reply hidden until approved and shows admin reply immediately', async () => {
+    insertPost({ title: 'Reply Target', slug: 'reply-target' })
+    const admin = await login()
+
+    // 访客根评论，审核通过
+    await request(app)
+      .post('/api/posts/reply-target/comments')
+      .send({ nickname: '访客甲', email: 'a@example.com', content: '请问怎么配置？' })
+    const pending = await request(app)
+      .get('/api/admin/comments?status=pending')
+      .set('Authorization', `Bearer ${admin}`)
+    const root = pending.body.data.list.find(
+      (c: { post_slug: string; content: string }) => c.post_slug === 'reply-target' && c.content === '请问怎么配置？',
+    )
+    expect(root).toBeTruthy()
+    await request(app)
+      .patch(`/api/admin/comments/${root.id}/status`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ status: 'approved' })
+
+    // 访客回复根评论：审核前不可见
+    const reply = await request(app)
+      .post('/api/posts/reply-target/comments')
+      .send({ nickname: '访客乙', email: 'b@example.com', content: '我也想知道', parent_id: root.id })
+    expect(reply.status).toBe(201)
+    const hidden = await request(app).get('/api/posts/reply-target/comments')
+    expect(hidden.body.data.some((c: { content: string }) => c.content === '我也想知道')).toBe(false)
+
+    // 审核通过后可见且带 parent_id
+    const pending2 = await request(app)
+      .get('/api/admin/comments?status=pending')
+      .set('Authorization', `Bearer ${admin}`)
+    const pendingReply = pending2.body.data.list.find((c: { content: string }) => c.content === '我也想知道')
+    await request(app)
+      .patch(`/api/admin/comments/${pendingReply.id}/status`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ status: 'approved' })
+    const visible = await request(app).get('/api/posts/reply-target/comments')
+    const replyRow = visible.body.data.find((c: { content: string }) => c.content === '我也想知道')
+    expect(replyRow.parent_id).toBe(root.id)
+    expect(replyRow.is_admin).toBe(0)
+
+    // 博主回复：无需审核，立即可见并标记 is_admin
+    const adminReply = await request(app)
+      .post(`/api/admin/comments/${root.id}/reply`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ content: '已私信解决' })
+    expect(adminReply.status).toBe(201)
+    const afterAdmin = await request(app).get('/api/posts/reply-target/comments')
+    const adminRow = afterAdmin.body.data.find((c: { content: string }) => c.content === '已私信解决')
+    expect(adminRow).toBeTruthy()
+    expect(adminRow.is_admin).toBe(1)
+    expect(adminRow.parent_id).toBe(root.id)
+  })
+
+  it('rejects reply to unknown or unapproved parent', async () => {
+    insertPost({ title: 'Reply Invalid', slug: 'reply-invalid' })
+    const admin = await login()
+    await request(app)
+      .post('/api/posts/reply-invalid/comments')
+      .send({ nickname: '访客', email: 'a@example.com', content: '待审核的父评论' })
+    const pending = await request(app)
+      .get('/api/admin/comments?status=pending')
+      .set('Authorization', `Bearer ${admin}`)
+    const target = pending.body.data.list.find(
+      (c: { post_slug: string; content: string }) => c.post_slug === 'reply-invalid' && c.content === '待审核的父评论',
+    )
+    expect(target).toBeTruthy()
+
+    // 未通过审核的父评论不能被回复
+    const unapproved = await request(app)
+      .post('/api/posts/reply-invalid/comments')
+      .send({ nickname: '访客', email: 'b@example.com', content: '回复', parent_id: target.id })
+    expect(unapproved.status).toBe(400)
+
+    // 不存在的父评论
+    const missing = await request(app)
+      .post('/api/posts/reply-invalid/comments')
+      .send({ nickname: '访客', email: 'b@example.com', content: '回复', parent_id: 999999 })
+    expect(missing.status).toBe(400)
+  })
+})
+
 describe('categories and tags integrity', () => {
   it('rejects duplicate category name with 409 semantics', async () => {
     await request(app)
@@ -715,6 +799,34 @@ describe('guestbook', () => {
     expect(pub.body.data.some((m: { content: string }) => m.content === '第一条留言')).toBe(true)
     const del = await request(app).delete(`/api/admin/guestbook/${msg.id}`).set('Authorization', `Bearer ${token}`)
     expect(del.status).toBe(200)
+  })
+
+  it('shows admin guestbook reply immediately with admin badge', async () => {
+    const admin = await login()
+    await request(app)
+      .post('/api/guestbook')
+      .send({ nickname: '访客', email: 'g@example.com', content: '等博主回复的留言' })
+    const list = await request(app)
+      .get('/api/admin/guestbook?status=pending')
+      .set('Authorization', `Bearer ${admin}`)
+    const msg = list.body.data.list.find((m: { content: string }) => m.content === '等博主回复的留言')
+    expect(msg).toBeTruthy()
+    await request(app)
+      .patch(`/api/admin/guestbook/${msg.id}/status`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ status: 'approved' })
+
+    const reply = await request(app)
+      .post(`/api/admin/guestbook/${msg.id}/reply`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ content: '这是博主的回复' })
+    expect(reply.status).toBe(201)
+
+    const pub = await request(app).get('/api/guestbook')
+    const adminRow = pub.body.data.find((m: { content: string }) => m.content === '这是博主的回复')
+    expect(adminRow).toBeTruthy()
+    expect(adminRow.is_admin).toBe(1)
+    expect(adminRow.parent_id).toBe(msg.id)
   })
 })
 

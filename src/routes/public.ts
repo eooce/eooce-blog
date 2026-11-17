@@ -142,7 +142,7 @@ router.get('/posts/:slug/comments', (req, res) => {
   }
   const list = db
     .prepare(
-      `SELECT id, nickname, content, created_at FROM comments
+      `SELECT id, parent_id, is_admin, nickname, content, created_at FROM comments
        WHERE post_id = ? AND status = 'approved' ORDER BY created_at DESC`,
     )
     .all(post.id)
@@ -153,7 +153,24 @@ const commentSchema = z.object({
   nickname: z.string().trim().min(1, '昵称不能为空').max(30),
   email: z.string().trim().email('邮箱格式不正确').max(100),
   content: z.string().trim().min(1, '评论内容不能为空').max(1000),
+  parent_id: z.number().int().positive().nullish(),
 })
+
+// 校验被回复的评论存在且已通过审核（文章评论还需属于当前文章）
+function findReplyParent(parentId: number | null | undefined, postId?: number): { id: number } | null {
+  if (parentId == null) return null
+  const parent = postId
+    ? (db
+        .prepare("SELECT id FROM comments WHERE id = ? AND post_id = ? AND status = 'approved'")
+        .get(parentId, postId) as { id: number } | undefined)
+    : (db
+        .prepare("SELECT id FROM guestbook_messages WHERE id = ? AND status = 'approved'")
+        .get(parentId) as { id: number } | undefined)
+  if (!parent) {
+    throw new HttpError(400, '被回复的评论不存在或尚未通过审核')
+  }
+  return parent
+}
 
 router.post('/posts/:slug/comments', (req, res) => {
   const post = db
@@ -168,12 +185,10 @@ router.post('/posts/:slug/comments', (req, res) => {
     return
   }
   const { nickname, email, content } = parsed.data
-  db.prepare('INSERT INTO comments (post_id, nickname, email, content) VALUES (?, ?, ?, ?)').run(
-    post.id,
-    nickname,
-    email,
-    content,
-  )
+  const parentId = findReplyParent(parsed.data.parent_id, post.id)?.id ?? null
+  db.prepare(
+    'INSERT INTO comments (post_id, parent_id, nickname, email, content) VALUES (?, ?, ?, ?, ?)',
+  ).run(post.id, parentId, nickname, email, content)
   ok(res, { message: '评论提交成功，审核通过后将展示' }, 201)
 })
 
@@ -182,7 +197,7 @@ router.post('/posts/:slug/comments', (req, res) => {
 router.get('/guestbook', (_req, res) => {
   const list = db
     .prepare(
-      `SELECT id, nickname, content, created_at FROM guestbook_messages
+      `SELECT id, parent_id, is_admin, nickname, content, created_at FROM guestbook_messages
        WHERE status = 'approved' ORDER BY created_at DESC LIMIT 100`,
     )
     .all()
@@ -196,11 +211,10 @@ router.post('/guestbook', (req, res) => {
     return
   }
   const { nickname, email, content } = parsed.data
-  db.prepare('INSERT INTO guestbook_messages (nickname, email, content) VALUES (?, ?, ?)').run(
-    nickname,
-    email,
-    content,
-  )
+  const parentId = findReplyParent(parsed.data.parent_id)?.id ?? null
+  db.prepare(
+    'INSERT INTO guestbook_messages (parent_id, nickname, email, content) VALUES (?, ?, ?, ?)',
+  ).run(parentId, nickname, email, content)
   ok(res, { message: '留言提交成功，审核通过后将展示' }, 201)
 })
 

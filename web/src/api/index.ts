@@ -31,7 +31,7 @@ export const publicApi = {
   posts: (params: PostQuery) => client.get<unknown, PageData<PostItem>>('/posts', { params }),
   post: (slug: string) => client.get<unknown, PostDetail>(`/posts/${slug}`),
   comments: (slug: string) => client.get<unknown, Comment[]>(`/posts/${slug}/comments`),
-  addComment: (slug: string, body: { nickname: string; email: string; content: string }) =>
+  addComment: (slug: string, body: { nickname: string; email: string; content: string; parent_id?: number | null }) =>
     client.post(`/posts/${slug}/comments`, body),
   categories: () => client.get<unknown, Category[]>('/categories'),
   tags: () => client.get<unknown, Tag[]>('/tags'),
@@ -40,7 +40,8 @@ export const publicApi = {
   nav: () => client.get<unknown, PublicNavItem[]>('/nav'),
   page: (slug: string) => client.get<unknown, CustomPage>(`/pages/${slug}`),
   guestbook: () => client.get<unknown, GuestbookMessage[]>('/guestbook'),
-  addGuestbook: (body: { nickname: string; email: string; content: string }) => client.post('/guestbook', body),
+  addGuestbook: (body: { nickname: string; email: string; content: string; parent_id?: number | null }) =>
+    client.post('/guestbook', body),
   links: () => client.get<unknown, FriendLink[]>('/links'),
 }
 
@@ -87,6 +88,8 @@ export const adminApi = {
     client.get<unknown, PageData<Comment>>('/admin/comments', { params }),
   patchCommentStatus: (id: number, status: string) =>
     client.patch(`/admin/comments/${id}/status`, { status }),
+  /** 博主回复评论：自动通过审核并带「博主」标识 */
+  replyComment: (id: number, content: string) => client.post<unknown, { id: number }>(`/admin/comments/${id}/reply`, { content }),
   deleteComment: (id: number) => client.delete(`/admin/comments/${id}`),
 
   updateSite: (body: Record<string, unknown>) => client.put('/admin/site', body),
@@ -98,6 +101,9 @@ export const adminApi = {
     client.get<unknown, PageData<GuestbookMessage>>('/admin/guestbook', { params }),
   patchGuestbookStatus: (id: number, status: string) =>
     client.patch(`/admin/guestbook/${id}/status`, { status }),
+  /** 博主回复留言：自动通过审核并带「博主」标识 */
+  replyGuestbook: (id: number, content: string) =>
+    client.post<unknown, { id: number }>(`/admin/guestbook/${id}/reply`, { content }),
   deleteGuestbook: (id: number) => client.delete(`/admin/guestbook/${id}`),
 
   links: () => client.get<unknown, FriendLink[]>('/admin/links'),

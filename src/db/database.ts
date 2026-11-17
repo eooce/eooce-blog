@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS post_tags (
 CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+  is_admin INTEGER NOT NULL DEFAULT 0,
   nickname TEXT NOT NULL,
   email TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -75,6 +77,8 @@ CREATE TABLE IF NOT EXISTS comments (
 
 CREATE TABLE IF NOT EXISTS guestbook_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  parent_id INTEGER REFERENCES guestbook_messages(id) ON DELETE CASCADE,
+  is_admin INTEGER NOT NULL DEFAULT 0,
   nickname TEXT NOT NULL,
   email TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -129,6 +133,17 @@ if (!tagColumns.some((c) => c.name === 'is_center')) {
 const categoryColumns = db.prepare('PRAGMA table_info(categories)').all() as Array<{ name: string }>
 if (!categoryColumns.some((c) => c.name === 'sort_order')) {
   db.exec('ALTER TABLE categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0')
+}
+
+// 旧库升级：comments / guestbook_messages 表补充回复字段（parent_id 指向被回复的评论，is_admin 标记博主回复）
+for (const table of ['comments', 'guestbook_messages']) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (!columns.some((c) => c.name === 'parent_id')) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN parent_id INTEGER REFERENCES ${table}(id) ON DELETE CASCADE`)
+  }
+  if (!columns.some((c) => c.name === 'is_admin')) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`)
+  }
 }
 
 export function estimateReadingMinutes(content: string): number {

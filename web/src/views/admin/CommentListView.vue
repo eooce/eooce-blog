@@ -17,6 +17,7 @@ const page = computed(() => Math.max(1, Number(route.query.page) || 1))
 const busy = ref(0)
 
 async function load() {
+  replyTarget.value = null
   loading.value = true
   try {
     const data =
@@ -84,6 +85,44 @@ async function remove(comment: Comment) {
     await load()
   } finally {
     busy.value = 0
+  }
+}
+
+/* 博主回复：展开内联回复框，提交后自动通过审核并带「博主」标识 */
+const replyTarget = ref<Comment | null>(null)
+const replyContent = ref('')
+const replySubmitting = ref(false)
+const replyError = ref('')
+
+function openReply(comment: Comment) {
+  replyTarget.value = comment
+  replyContent.value = ''
+  replyError.value = ''
+}
+
+function cancelReply() {
+  replyTarget.value = null
+  replyContent.value = ''
+  replyError.value = ''
+}
+
+async function submitReply() {
+  const target = replyTarget.value
+  if (!target) return
+  replyError.value = ''
+  replySubmitting.value = true
+  try {
+    if (source.value === 'guestbook') {
+      await adminApi.replyGuestbook(target.id, replyContent.value)
+    } else {
+      await adminApi.replyComment(target.id, replyContent.value)
+    }
+    cancelReply()
+    await load()
+  } catch (e) {
+    replyError.value = e instanceof Error ? e.message : '回复失败，请重试'
+  } finally {
+    replySubmitting.value = false
   }
 }
 
@@ -164,10 +203,16 @@ onMounted(() => {
             <div>
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ comment.nickname }}</span>
+                <span
+                  v-if="comment.is_admin"
+                  class="rounded bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-400"
+                  >博主</span
+                >
                 <span class="badge" :class="statusBadge(comment.status)">{{ statusLabel(comment.status) }}</span>
                 <span class="text-xs text-slate-400">{{ dayjs(comment.created_at).format('YYYY-MM-DD HH:mm') }}</span>
               </div>
               <p class="mt-0.5 text-xs text-slate-400">
+                <template v-if="comment.parent_nickname">回复 @{{ comment.parent_nickname }} · </template>
                 <template v-if="source === 'guestbook'">来自留言板</template>
                 <template v-else>
                   评论于
@@ -179,6 +224,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="flex gap-1.5">
+            <button class="btn-outline !px-2.5 !py-1 text-xs" :disabled="busy === comment.id" @click="openReply(comment)">回复</button>
             <template v-if="comment.status !== 'approved'">
               <button class="btn-outline !px-2.5 !py-1 text-xs" :disabled="busy === comment.id" @click="setStatus(comment, 'approved')">通过</button>
             </template>
@@ -191,6 +237,34 @@ onMounted(() => {
         <p class="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
           {{ comment.content }}
         </p>
+        <!-- 内联回复框 -->
+        <div v-if="replyTarget?.id === comment.id" class="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/5">
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-xs font-medium text-brand-600 dark:text-brand-400">
+              回复 @{{ comment.nickname }}（将以博主身份发布，直接通过审核）
+            </p>
+            <button class="text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200" @click="cancelReply">取消</button>
+          </div>
+          <textarea
+            v-model="replyContent"
+            rows="3"
+            maxlength="1000"
+            required
+            placeholder="写下你的回复... *"
+            class="input resize-none"
+          />
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <p v-if="replyError" class="text-xs text-rose-600 dark:text-rose-400">{{ replyError }}</p>
+            <span v-else class="text-xs text-slate-400">回复发布后立即在前台展示</span>
+            <button
+              class="btn-primary !px-3 !py-1.5 text-xs"
+              :disabled="replySubmitting || !replyContent.trim()"
+              @click="submitReply"
+            >
+              {{ replySubmitting ? '发布中...' : '发布回复' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

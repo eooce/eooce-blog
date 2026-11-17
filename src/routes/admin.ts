@@ -447,13 +447,37 @@ router.get('/comments', (req, res) => {
   ).c
   const list = db
     .prepare(
-      `SELECT cm.id, cm.post_id, cm.nickname, cm.email, cm.content, cm.status, cm.created_at,
-        p.title AS post_title, p.slug AS post_slug
-       FROM comments cm JOIN posts p ON p.id = cm.post_id ${where}
+      `SELECT cm.id, cm.post_id, cm.parent_id, cm.is_admin, cm.nickname, cm.email, cm.content, cm.status, cm.created_at,
+        p.title AS post_title, p.slug AS post_slug, pc.nickname AS parent_nickname
+       FROM comments cm JOIN posts p ON p.id = cm.post_id
+       LEFT JOIN comments pc ON pc.id = cm.parent_id ${where}
        ORDER BY cm.created_at DESC LIMIT ? OFFSET ?`,
     )
     .all(...params, pageSize, (page - 1) * pageSize)
   ok(res, { list, total, page, pageSize })
+})
+
+const replySchema = z.object({
+  content: z.string().trim().min(1, '回复内容不能为空').max(1000),
+})
+
+// 博主回复：以当前管理员身份发布，自动通过审核并标记 is_admin
+router.post('/comments/:id/reply', (req, res) => {
+  const parsed = replySchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, 400, parsed.error.issues[0]?.message ?? '回复信息不完整')
+    return
+  }
+  const target = db
+    .prepare('SELECT id, post_id FROM comments WHERE id = ?')
+    .get(Number(req.params.id)) as { id: number; post_id: number } | undefined
+  if (!target) throw new HttpError(404, '评论不存在')
+  const result = db
+    .prepare(
+      "INSERT INTO comments (post_id, parent_id, is_admin, nickname, email, content, status) VALUES (?, ?, 1, ?, '', ?, 'approved')",
+    )
+    .run(target.post_id, target.id, req.auth?.username ?? '', parsed.data.content)
+  ok(res, { id: Number(result.lastInsertRowid) }, 201)
 })
 
 router.patch('/comments/:id/status', (req, res) => {
@@ -484,18 +508,38 @@ router.get('/guestbook', (req, res) => {
   const status = typeof req.query.status === 'string' && ['pending', 'approved', 'rejected'].includes(req.query.status)
     ? req.query.status
     : ''
-  const where = status ? 'WHERE status = ?' : ''
+  const where = status ? 'WHERE gm.status = ?' : ''
   const params: unknown[] = status ? [status] : []
   const total = (
-    db.prepare(`SELECT COUNT(*) AS c FROM guestbook_messages ${where}`).get(...params) as { c: number }
+    db.prepare(`SELECT COUNT(*) AS c FROM guestbook_messages gm ${where}`).get(...params) as { c: number }
   ).c
   const list = db
     .prepare(
-      `SELECT id, nickname, email, content, status, created_at FROM guestbook_messages ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT gm.id, gm.parent_id, gm.is_admin, gm.nickname, gm.email, gm.content, gm.status, gm.created_at,
+        pg.nickname AS parent_nickname
+       FROM guestbook_messages gm LEFT JOIN guestbook_messages pg ON pg.id = gm.parent_id ${where}
+       ORDER BY gm.created_at DESC LIMIT ? OFFSET ?`,
     )
     .all(...params, pageSize, (page - 1) * pageSize)
   ok(res, { list, total, page, pageSize })
+})
+
+router.post('/guestbook/:id/reply', (req, res) => {
+  const parsed = replySchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, 400, parsed.error.issues[0]?.message ?? '回复信息不完整')
+    return
+  }
+  const target = db
+    .prepare('SELECT id FROM guestbook_messages WHERE id = ?')
+    .get(Number(req.params.id)) as { id: number } | undefined
+  if (!target) throw new HttpError(404, '留言不存在')
+  const result = db
+    .prepare(
+      "INSERT INTO guestbook_messages (parent_id, is_admin, nickname, email, content, status) VALUES (?, 1, ?, '', ?, 'approved')",
+    )
+    .run(target.id, req.auth?.username ?? '', parsed.data.content)
+  ok(res, { id: Number(result.lastInsertRowid) }, 201)
 })
 
 router.patch('/guestbook/:id/status', (req, res) => {
